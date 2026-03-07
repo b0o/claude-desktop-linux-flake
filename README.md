@@ -14,7 +14,7 @@ Supports the Tray menu! (Screenshot of running on KDE)
 
 ![image](https://github.com/user-attachments/assets/ba209824-8afb-437c-a944-b53fd9ecd559)
 
-This is a Nix flake for running Claude Desktop on Linux.
+This is a Nix flake for running Claude Desktop on Linux with proper desktop integration.
 
 # Usage
 
@@ -45,6 +45,17 @@ If you would like to run [MCP servers with Claude Desktop](https://modelcontextp
 ```nix
 inputs.claude-desktop.packages.${system}.claude-desktop-with-fhs
 ```
+
+## GNOME Desktop Integration
+
+This flake includes comprehensive fixes for proper GNOME desktop integration, particularly on Wayland:
+
+- **Correct Icon Display**: Shows the proper orange Claude sunburst icon instead of a generic gear icon
+- **Dock Icon Grouping**: Running applications properly group with pinned dock icons (no duplicate icons)
+- **Wayland Compatibility**: Proper window class and desktop file association for GNOME on Wayland
+- **FHS + Desktop Integration**: The `claude-desktop-with-fhs` package includes both MCP server support AND desktop files
+
+The integration has been thoroughly tested on GNOME 48 with Wayland and works reliably across different installation methods.
 
 ## Other distributions
 

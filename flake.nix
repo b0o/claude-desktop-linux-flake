@@ -22,27 +22,48 @@
         claude-desktop = pkgs.callPackage ./pkgs/claude-desktop.nix {
           inherit patchy-cnb;
         };
-        claude-desktop-with-fhs = pkgs.buildFHSEnv {
-          name = "claude-desktop";
-          targetPkgs = pkgs:
-            with pkgs; [
-              docker
-              glibc
-              openssl
-              nodejs
-              uv
-            ];
-          runScript = "${claude-desktop}/bin/claude-desktop";
-          extraInstallCommands = ''
-            # Copy desktop file from the claude-desktop package
-            mkdir -p $out/share/applications
-            cp ${claude-desktop}/share/applications/claude.desktop $out/share/applications/
-
-            # Copy icons
-            mkdir -p $out/share/icons
-            cp -r ${claude-desktop}/share/icons/* $out/share/icons/
+        claude-desktop-with-fhs = pkgs.symlinkJoin {
+          name = "claude-desktop-with-fhs";
+          paths = [
+            claude-desktop
+            (pkgs.buildFHSEnv {
+              name = "claude-desktop-bwrap";
+              targetPkgs = pkgs: with pkgs; [
+                docker
+                glibc
+                openssl
+                nodejs
+                uv
+                glib
+                gvfs
+                xdg-utils
+              ];
+              runScript = "${claude-desktop}/bin/claude-desktop";
+            })
+          ];
+          postBuild = ''
+            # Replace the regular binary with the FHS wrapped one
+            rm -f $out/bin/claude-desktop
+            ln -sf $out/bin/claude-desktop-bwrap $out/bin/claude-desktop
           '';
         };
+
+        # Shell environment for MCP development/installation
+        claude-desktop-shell = pkgs.buildFHSEnv {
+          name = "claude-desktop-shell";
+          targetPkgs = pkgs: with pkgs; [
+            docker
+            glibc
+            openssl
+            nodejs
+            uv
+            glib
+            gvfs
+            xdg-utils
+          ];
+          runScript = "bash";
+        };
+        
         default = claude-desktop;
       };
     });

@@ -1,0 +1,224 @@
+name: Update Claude Desktop
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+    inputs:
+      dmg_url:
+        description: 'Full DMG download URL (optional - will auto-detect if not provided)'
+        required: false
+        type: string
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Playwright
+      run: |
+        npm install playwright
+        npx playwright install chromium
+
+    - name: Check for new version
+      id: check-version
+      run: |
+        # Get current version from flake
+        CURRENT_VERSION=$(grep 'version = ' pkgs/claude-desktop.nix | cut -d'"' -f2)
+        echo "Current version: $CURRENT_VERSION"
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+        # If manual DMG URL provided, use it directly
+        if [ -n "${{ inputs.dmg_url }}" ]; then
+          echo "Manual DMG URL provided: ${{ inputs.dmg_url }}"
+          LATEST_VERSION=$(echo "${{ inputs.dmg_url }}" | grep -oP 'universal/\K[0-9]+\.[0-9]+\.[0-9]+(?=/)' || echo "")
+          if [ -n "$LATEST_VERSION" ]; then
+            echo "Extracted version: $LATEST_VERSION"
+            echo "needs_update=true" >> $GITHUB_OUTPUT
+            echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+            echo "dmg_url=${{ inputs.dmg_url }}" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "::error::Could not extract version from provided URL"
+            exit 1
+          fi
+        fi
+
+        # Use Playwright to get the redirect URL (bypasses Cloudflare)
+        cat > get-version.js << 'EOF'
+        const { chromium } = require('playwright');
+
+        (async () => {
+          const browser = await chromium.launch({
+            headless: true,
+            args: ['--disable-blink-features=AutomationControlled']
+          });
+          const context = await browser.newContext({
+            userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            acceptDownloads: true
+          });
+          const page = await context.newPage();
+
+          try {
+            console.error('Navigating to redirect URL...');
+
+            // Set up download handler to capture the download URL
+            const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
+
+            // Navigate - this will trigger a download
+            page.goto('https://claude.ai/api/desktop/darwin/universal/dmg/latest/redirect').catch(() => {});
+
+            // Wait for the download to start and get the URL
+            const download = await downloadPromise;
+            const downloadUrl = download.url();
+            console.error('Download URL captured: ' + downloadUrl);
+
+            // Cancel the download - we only need the URL
+            await download.cancel();
+
+            // Output the URL (this is what we grep for)
+            console.log(downloadUrl);
+
+          } catch (error) {
+            console.error('Error:', error.message);
+
+            // If download event times out, try checking response headers
+            console.error('Trying alternative method...');
+            try {
+              const response = await page.goto(
+                'https://claude.ai/api/desktop/darwin/universal/dmg/latest/redirect',
+                { waitUntil: 'commit', timeout: 30000 }
+              );
+              const headers = response?.headers();
+              if (headers?.location) {
+                console.log(headers.location);
+              }
+            } catch (e) {
+              console.error('Alternative method also failed:', e.message);
+            }
+            process.exit(1);
+          } finally {
+            await browser.close();
+          }
+        })();
+        EOF
+
+        # Run the script and capture all output
+        echo "Running Playwright script..."
+        node get-version.js 2>&1 | tee /tmp/playwright-output.txt
+        REDIRECT_URL=$(grep -E '^https://downloads\.claude\.ai' /tmp/playwright-output.txt | head -1 || echo "")
+        echo "Redirect URL: $REDIRECT_URL"
+
+        if [ -z "$REDIRECT_URL" ]; then
+          echo "::warning::Could not detect latest version via browser automation"
+          echo "needs_update=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Extract version from redirect URL
+        LATEST_VERSION=$(echo "$REDIRECT_URL" | grep -oP 'universal/\K[0-9]+\.[0-9]+\.[0-9]+(?=/)' || echo "")
+        echo "Latest version: $LATEST_VERSION"
+
+        if [ -z "$LATEST_VERSION" ]; then
+          echo "::warning::Could not extract version from redirect URL"
+          echo "needs_update=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+          echo "New version available: $LATEST_VERSION"
+          echo "needs_update=true" >> $GITHUB_OUTPUT
+          echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "dmg_url=$REDIRECT_URL" >> $GITHUB_OUTPUT
+        else
+          echo "No update needed - already on latest version"
+          echo "needs_update=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Install Nix
+      if: steps.check-version.outputs.needs_update == 'true'
+      uses: DeterminateSystems/nix-installer-action@v14
+
+    - name: Setup Nix cache
+      if: steps.check-version.outputs.needs_update == 'true'
+      uses: DeterminateSystems/magic-nix-cache-action@v7
+
+    - name: Download DMG and calculate hash
+      if: steps.check-version.outputs.needs_update == 'true'
+      id: download-hash
+      run: |
+        echo "Downloading Mac DMG for version ${{ steps.check-version.outputs.new_version }}..."
+        curl -sL -o /tmp/claude.dmg "${{ steps.check-version.outputs.dmg_url }}"
+
+        # Verify download succeeded
+        if [ ! -s /tmp/claude.dmg ]; then
+          echo "::error::Failed to download DMG"
+          exit 1
+        fi
+
+        # Get SHA256 hash
+        NEW_HASH=$(sha256sum /tmp/claude.dmg | cut -d' ' -f1)
+        echo "new_hash=$NEW_HASH" >> $GITHUB_OUTPUT
+        echo "SHA256: $NEW_HASH"
+
+    - name: Update flake
+      if: steps.check-version.outputs.needs_update == 'true'
+      run: |
+        # Update version in the nix file
+        sed -i 's/version = "[^"]*"/version = "${{ steps.check-version.outputs.new_version }}"/' pkgs/claude-desktop.nix
+
+        # Extract the DMG filename hash from the download URL
+        # URL format: .../Claude-{hash}.dmg
+        DMG_FILENAME=$(basename "${{ steps.check-version.outputs.dmg_url }}")
+        FILE_HASH=$(echo "$DMG_FILENAME" | sed 's/Claude-\(.*\)\.dmg/\1/')
+        echo "DMG filename hash: $FILE_HASH"
+
+        # Update only the filename hash in the URL (keep ${version} interpolation)
+        sed -i "s|/Claude-[^\"]*\.dmg\"|/Claude-${FILE_HASH}.dmg\"|" pkgs/claude-desktop.nix
+
+        # Convert hex hash to SRI format for the content hash
+        NEW_HASH_B64=$(echo -n "${{ steps.download-hash.outputs.new_hash }}" | xxd -r -p | base64 -w 0)
+        sed -i "s|sha256-[^\"]*\"|sha256-${NEW_HASH_B64}\"|" pkgs/claude-desktop.nix
+
+        # Show the changes
+        echo "Updated nix file:"
+        grep -A3 'srcDmg = fetchurl' pkgs/claude-desktop.nix
+
+    - name: Verify flake
+      if: steps.check-version.outputs.needs_update == 'true'
+      run: |
+        nix flake check
+
+    - name: Create Pull Request
+      if: steps.check-version.outputs.needs_update == 'true'
+      uses: peter-evans/create-pull-request@v6
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: |
+          feat: update Claude Desktop to version ${{ steps.check-version.outputs.new_version }}
+
+          🤖 Automated update via GitHub Actions (Mac source)
+        title: 'Update Claude Desktop to version ${{ steps.check-version.outputs.new_version }}'
+        body: |
+          ## Summary
+          - Updates Claude Desktop from current version to ${{ steps.check-version.outputs.new_version }}
+          - SHA256 hash updated for new Mac DMG
+          - Flake check passed successfully
+
+          ## Test plan
+          - [ ] Verify the flake builds successfully
+          - [ ] Test the updated application runs correctly
+          - [ ] Confirm all functionality works as expected
+
+          🤖 This PR was created automatically by GitHub Actions
+        branch: update-claude-desktop-${{ steps.check-version.outputs.new_version }}
+        delete-branch: true
