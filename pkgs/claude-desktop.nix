@@ -289,12 +289,12 @@ in
       # Create wrapper
       # NOTE: Global shortcuts (Ctrl+Alt+Space) don't work in native Wayland mode
       # due to Electron/Chromium limitations. We default to X11/XWayland for compatibility.
-      # Set CLAUDE_USE_WAYLAND=1 to force native Wayland (shortcuts won't work).
+      # Unset WAYLAND_DISPLAY to force X11 mode.
       mkdir -p $out/bin
       makeWrapper ${electron}/bin/electron $out/bin/$pname \
         --prefix LD_LIBRARY_PATH : "${libraryPath}" \
         --add-flags "$out/lib/$pname/app.asar" \
-        --add-flags "\''${CLAUDE_USE_WAYLAND:+--ozone-platform-hint=auto --enable-features=WaylandWindowDecorations,UseOzonePlatform --gtk-version=4}" \
+        --add-flags "\''${WAYLAND_DISPLAY:+--ozone-platform-hint=auto --enable-features=WaylandWindowDecorations,UseOzonePlatform --gtk-version=4}" \
         --set GIO_EXTRA_MODULES "${glib-networking}/lib/gio/modules" \
         --set-default GDK_BACKEND "x11" \
         --set CHROME_DESKTOP "Claude.desktop" \
