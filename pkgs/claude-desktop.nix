@@ -284,7 +284,7 @@ in
 
       # Install .desktop file
       mkdir -p $out/share/applications
-      install -Dm0644 {${desktopItem},$out}/share/applications/Claude.desktop
+      install -Dm0644 {${desktopItem},$out}/share/applications/claude-desktop.desktop
 
       # Create wrapper
       # NOTE: Global shortcuts (Ctrl+Alt+Space) don't work in native Wayland mode

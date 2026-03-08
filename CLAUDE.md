@@ -28,9 +28,9 @@ nix build .#claude-desktop-with-fhs
 
 ```bash
 cd patchy-cnb
-npm run build         # Build release version
-npm run build:debug   # Build debug version
-npm test             # Run tests
+npm run build       # Build release version
+npm run build:debug # Build debug version
+npm test            # Run tests
 ```
 
 ## Architecture
@@ -65,7 +65,7 @@ This flake includes fixes for proper GNOME desktop integration:
 
 ### Technical Details
 
-- Desktop file named `Claude.desktop` with `StartupWMClass=Claude` for proper window association
+- Desktop file named `claude-desktop.desktop` with `StartupWMClass=Claude` for proper window association
 - Icon references use `claude` to match installed PNG files in hicolor theme structure
 - FHS wrapper uses `symlinkJoin` to combine desktop integration with MCP environment
 - Environment variables set for optimal Wayland/Electron integration
@@ -79,6 +79,7 @@ The integration has been thoroughly tested on GNOME 48 with Wayland and works re
 This flake includes an FHS shell environment for installing MCP servers. To set up Home Assistant integration:
 
 ### Install MCP Proxy
+
 ```bash
 nix run .#claude-desktop-shell
 uv tool install mcp-proxy
@@ -86,7 +87,9 @@ export PATH="/home/tom/.local/bin:$PATH"
 ```
 
 ### Configure Claude Desktop
+
 Create `/home/tom/.config/Claude/claude_desktop_config.json`:
+
 ```json
 {
   "mcpServers": {
@@ -102,12 +105,15 @@ Create `/home/tom/.config/Claude/claude_desktop_config.json`:
 ```
 
 ### Enable in Home Assistant
+
 Add to `configuration.yaml`:
+
 ```yaml
 mcp_server:
 ```
 
 Then restart Home Assistant and Claude Desktop with FHS support:
+
 ```bash
 nix run .#claude-desktop-with-fhs
 ```
