@@ -1,16 +1,12 @@
 {
   lib,
-  stdenv,
-  cargo,
   rustPlatform,
-  rustc,
   napi-rs-cli,
   nodejs,
-  libiconv,
 }: let
   patchy-cnb-repo = ../patchy-cnb;
 in
-  rustPlatform.buildRustPackage rec {
+  rustPlatform.buildRustPackage {
     pname = "patchy-cnb";
     version = "0.1.0";
 

@@ -7,7 +7,6 @@
   };
 
   outputs = {
-    self,
     nixpkgs,
     flake-utils,
   }:
@@ -28,16 +27,17 @@
             claude-desktop
             (pkgs.buildFHSEnv {
               name = "claude-desktop-bwrap";
-              targetPkgs = pkgs: with pkgs; [
-                docker
-                glibc
-                openssl
-                nodejs
-                uv
-                glib
-                gvfs
-                xdg-utils
-              ];
+              targetPkgs = pkgs:
+                with pkgs; [
+                  docker
+                  glibc
+                  openssl
+                  nodejs
+                  uv
+                  glib
+                  gvfs
+                  xdg-utils
+                ];
               runScript = "${claude-desktop}/bin/claude-desktop";
             })
           ];
@@ -51,19 +51,20 @@
         # Shell environment for MCP development/installation
         claude-desktop-shell = pkgs.buildFHSEnv {
           name = "claude-desktop-shell";
-          targetPkgs = pkgs: with pkgs; [
-            docker
-            glibc
-            openssl
-            nodejs
-            uv
-            glib
-            gvfs
-            xdg-utils
-          ];
+          targetPkgs = pkgs:
+            with pkgs; [
+              docker
+              glibc
+              openssl
+              nodejs
+              uv
+              glib
+              gvfs
+              xdg-utils
+            ];
           runScript = "bash";
         };
-        
+
         default = claude-desktop;
       };
     });
