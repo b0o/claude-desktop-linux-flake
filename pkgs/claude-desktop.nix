@@ -38,7 +38,7 @@ in
     ];
 
     desktopItem = makeDesktopItem {
-      name = "Claude";
+      name = "claude-desktop";
       exec = "claude-desktop %u";
       icon = "claude";
       type = "Application";
