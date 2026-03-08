@@ -297,7 +297,7 @@ in
         --add-flags "\''${WAYLAND_DISPLAY:+--ozone-platform-hint=auto --enable-features=WaylandWindowDecorations,UseOzonePlatform --gtk-version=4}" \
         --set GIO_EXTRA_MODULES "${glib-networking}/lib/gio/modules" \
         --set-default GDK_BACKEND "x11" \
-        --set CHROME_DESKTOP "Claude.desktop" \
+        --set CHROME_DESKTOP "claude-desktop.desktop" \
         --set-default GTK_THEME "\''${GTK_THEME:-Adwaita:dark}" \
         --set-default COLOR_SCHEME_PREFERENCE "\''${COLOR_SCHEME_PREFERENCE:-dark}" \
         --prefix XDG_DATA_DIRS : "$out/share"
