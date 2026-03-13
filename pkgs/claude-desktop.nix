@@ -14,12 +14,12 @@
   glib-networking,
 }: let
   pname = "claude-desktop";
-  version = "1.1.5368";
+  version = "1.1.6452";
   # Mac DMG source - actively updated, unlike Windows installer
   # Version discovery: curl -s https://downloads.claude.ai/releases/darwin/universal/RELEASES.json
   srcDmg = fetchurl {
-    url = "https://downloads.claude.ai/releases/darwin/universal/${version}/Claude-d12d0218c6c7bc46d52919117bd57508c591a8ad.dmg";
-    hash = "sha256-fDaxGdlwKCfFNCI8axmFpppOBNHq6GNN0Anwp6hYUrg=";
+    url = "https://downloads.claude.ai/releases/darwin/universal/${version}/Claude-5afc23a0310b20a371d1fbd79ddf31a392ebef25.dmg";
+    hash = "sha256-KDbiojma/QvA0mzGgnkTsoTieJBWafLY+nGqLV3T1Sw=";
   };
   libraryPath = lib.makeLibraryPath [glib-networking];
 in
